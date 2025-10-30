@@ -3,7 +3,6 @@
 # Variables
 PROTO_DIR := proto
 PROTO_FILES := $(wildcard $(PROTO_DIR)/*.proto)
-GO_OUT := $(PROTO_DIR)
 
 # Default
 help:
@@ -18,9 +17,10 @@ help:
 proto:
 	@echo "Generating gRPC code from proto files"
 	@protoc \
-		--go_out=$(GO_OUT) \
+		--proto_path=. \
+		--go_out=. \
 		--go_opt=paths=source_relative \
-		--go-grpc_out=$(GO_OUT) \
+		--go-grpc_out=. \
 		--go-grpc_opt=paths=source_relative \
 		$(PROTO_FILES)
 	@echo "Proto generation complete"
