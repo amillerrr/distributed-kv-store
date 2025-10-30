@@ -1,0 +1,24 @@
+# Binaries
+bin/
+*.so
+*.dylib
+
+# Test and coverage
+*.test
+*.out
+coverage.out
+
+# Generated protobuf files
+*.pb.go
+
+# Vim/Neovim
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local
