@@ -1,0 +1,31 @@
+#Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+*.test
+*.out
+coverage.out
+
+# Generated files
+*.pb.go
+
+# IDE
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Documentation
+README.md
+*.md
+
+# CI/CD
+.github/

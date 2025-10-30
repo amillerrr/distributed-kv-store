@@ -14,6 +14,14 @@ help:
 	@echo "  run           - Run the server locally"
 	@echo "  test          - Run tests"
 	@echo "  clean         - Remove generated files and binaries"
+	@echo "  deps          - Download dependencies"
+	@echo ""
+	@echo "Docker targets:"
+	@echo "  docker-build  - Build Docker image"
+	@echo "  docker-run    - Run server in Docker container"
+	@echo "  docker-stop   - Stop and remove Docker container"
+	@echo "  docker-logs   - View container logs"
+	@echo "  docker-shell  - Open shell in running container"
 
 # Generate Go code from proto files
 proto:
@@ -69,3 +77,40 @@ deps:
 	@go mod download
 	@go mod tidy
 	@echo "Dependencies ready"
+
+# Docker image name
+DOCKER_IMAGE := kvstore-server
+DOCKER_TAG := latest
+
+# Build Docker image
+docker-build:
+	@echo "Building Docker image"
+	@docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@echo "Docker image built: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+
+# Run Docker container
+docker-run:
+	@echo "Running Docker container"
+	@docker run -d \
+		--name kvstore-server \
+		-p 50051:50051 \
+		-p 8080:8080 \
+		$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@echo "  Container started: kvstore-server"
+	@echo "  gRPC: localhost:50051"
+	@echo "  Health: http://localhost:8080/health/live"
+
+# Stop and remove Docker container
+docker-stop:
+	@echo "Stopping Docker container"
+	@docker stop kvstore-server || true
+	@docker rm kvstore-server || true
+	@echo "Container stopped and removed"
+
+# View Docker logs
+docker-logs:
+	@docker logs -f kvstore-server
+
+# Docker shell (for debugging)
+docker-shell:
+	@docker exec -it kvstore-server sh
