@@ -1,0 +1,75 @@
+services:
+  # KV Store Server - Instance 1
+  kvstore-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kvstore-server-1
+    hostname: kvstore-1
+    ports:
+      - "50051:50051"  # gRPC
+      - "8080:8080"    # Health checks
+    environment:
+      - GRPC_PORT=50051
+      - HTTP_PORT=8080
+    networks:
+      - kvstore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "app=kvstore"
+      - "instance=1"
+
+  # KV Store Server - Instance 2
+  kvstore-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kvstore-server-2
+    hostname: kvstore-2
+    ports:
+      - "50052:50051"  
+      - "8081:8080"    
+    environment:
+      - GRPC_PORT=50051
+      - HTTP_PORT=8080
+    networks:
+      - kvstore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "app=kvstore"
+      - "instance=2"
+
+  # Client for testing 
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: kvstore-client
+    depends_on:
+      kvstore-1:
+        condition: service_healthy
+      kvstore-2:
+        condition: service_healthy
+    networks:
+      - kvstore-network
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "sleep infinity"]
+    profiles:
+      - testing 
+
+networks:
+  kvstore-network:
+    driver: bridge
+    name: kvstore-network

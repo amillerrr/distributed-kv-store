@@ -1,0 +1,43 @@
+# Build stage
+FROM golang:1.25-alpine AS builder
+
+RUN apk add --no-cache git make protobuf-dev
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+COPY . .
+
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+RUN make proto
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s" \
+    -o kvstore-client \
+    ./cmd/client
+
+# Runtime stage
+FROM alpine:3.19
+
+RUN apk --no-cache add ca-certificates && \
+    addgroup -g 1000 kvstore && \
+    adduser -D -u 1000 -G kvstore kvstore
+
+WORKDIR /app
+
+COPY --from=builder /build/kvstore-client .
+
+RUN chown -R kvstore:kvstore /app
+
+USER kvstore
+
+LABEL maintainer="andrew@mill3r.la" \
+      version="1.0.0" \
+      description="Distributed Key-Value Store gRPC Service"
+
+ENTRYPOINT ["./kvstore-client"]

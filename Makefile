@@ -22,6 +22,15 @@ help:
 	@echo "  docker-stop   - Stop and remove Docker container"
 	@echo "  docker-logs   - View container logs"
 	@echo "  docker-shell  - Open shell in running container"
+	@echo ""
+	@echo "Docker Compose targets:"
+	@echo "  compose-up              - Start all services"
+	@echo "  compose-up-with-client  - Start all services including client"
+	@echo "  compose-down            - Stop all services"
+	@echo "  compose-logs            - View logs from all services"
+	@echo "  compose-ps              - List running services"
+	@echo "  compose-restart         - Restart all services"
+	@echo "  compose-test            - Test both server instances"
 
 # Generate Go code from proto files
 proto:
@@ -114,3 +123,42 @@ docker-logs:
 # Docker shell (for debugging)
 docker-shell:
 	@docker exec -it kvstore-server sh
+
+# Docker Compose commands
+compose-up:
+	@echo "Starting all services"
+	@docker compose up -d
+	@echo "  Services started"
+	@echo "  Instance 1 - gRPC: localhost:50051, Health: http://localhost:8080"
+	@echo "  Instance 2 - gRPC: localhost:50052, Health: http://localhost:8081"
+
+compose-up-with-client:
+	@echo "Starting all services with client..."
+	@docker compose --profile testing up -d
+	@echo "Services started (including client)"
+
+compose-down:
+	@echo "Stopping all services"
+	@docker compose down
+	@echo "Services stopped"
+
+compose-logs:
+	@docker compose logs -f
+
+compose-ps:
+	@docker compose ps
+
+compose-restart:
+	@docker compose restart
+
+# Test distributed setup
+compose-test:
+	@echo "Testing instance 1"
+	@./bin/kvstore-client -server=localhost:50051 -op=set -key=test:1 -value="Instance 1"
+	@./bin/kvstore-client -server=localhost:50051 -op=get -key=test:1
+	@echo ""
+	@echo "Testing instance 2"
+	@./bin/kvstore-client -server=localhost:50052 -op=set -key=test:2 -value="Instance 2"
+	@./bin/kvstore-client -server=localhost:50052 -op=get -key=test:2
+	@echo ""
+	@echo "Both instances working independently"
