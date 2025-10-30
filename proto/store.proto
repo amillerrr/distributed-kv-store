@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package kvstore;
+
+option go_package = "github.com/amillerrr/distributed-kv-store/proto;kvstore";
+
+// Provide kv storage operations
+service KeyValueStore {
+  // Retrieve value for a given key
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Store or update k/v pairs
+  rpc Set(SetRequest) returns (SetResponse);
+
+  // Stream value changes for matching keys
+  rpc Subscribe(SubscribeRequest) returns (stream ChangeEvent);
+}
+
+// Specify key to retrieve
+message GetRequest {
+  string key = 1;
+}
+
+// Retrieve value or false if key was not found
+message GetResponse {
+  string value = 1;
+  bool found = 2;
+}
+
+// Set the k/v to store
+message SetRequest {
+  string key = 1;
+  string value = 2;
+}
+
+// Response if operation succeeds
+message SetResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Specify a key to watch for changes
+message SubscribeRequest {
+  string key_pattern = 1;
+}
+
+// Represent changes to a k/v pair
+message ChangeEvent {
+  enum ChangeType {
+    UNKNOWN = 0;
+    SET = 1;
+    DELETE = 2;
+  }
+
+  ChangeType change_type = 1;
+  string key = 2;
+  string value = 3;
+  int64 timestamp = 4;
+}
+
