@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -49,17 +53,61 @@ func main() {
 	// Register reflection service
 	reflection.Register(grpcServer)
 
-	slog.Info("gRPC server listening", "address", lis.Addr().String())
+	// Create HTTP server for health checks
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/health/live", livenessHandler)
+	healthMux.HandleFunc("/health/ready", readinessHandler(kvStore))
 
-	// Start serving
-	if err := grpcServer.Serve(lis); err != nil {
-		slog.Error("failed to serve", "error", err)
-		os.Exit(1)
+	httpServer := &http.Server{
+		Addr: fmt.Sprintf(":%s", httpPort),
+		Handler: healthMux,
 	}
+
+	// Channel to listen for errors
+	serverErrors := make(chan error, 1)
+	
+	go func() {
+		slog.Info("gRPC server listening", "address", lis.Addr().String())
+		serverErrors <- grpcServer.Serve(lis)
+	}()
+
+	go func() {
+		slog.Info("HTTP health server listening", "address", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErrors <- err
+		}
+	}()
+
+	// Signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Block until signal or error received
+	select {
+	case err := <-serverErrors:
+		slog.Error("server error", "error", err)
+	case sig := <-sigChan:
+		slog.Info("received shutdown signal", "signal", sig.String())
+	}
+
+	slog.Info("initiating graceful shutdown")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		slog.Error("HTTP server shutdown error", "error", err)
+	} else {
+		slog.Info("HTTP server stopped gracefully")
+	}
+
+	grpcServer.GracefulStop()
+	slog.Info("gRPC server stopped gracefully")
+	slog.Info("shutdown complete")
 }
 
 // Log incoming gRPC requests
-func loggingInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func loggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	slog.Info("gRPC request", "method", info.FullMethod)
 
 	resp, err := handler(ctx, req)
@@ -71,6 +119,24 @@ func loggingInterceptor(ctx context.Context, req interface{}, info *grpc.UnarySe
 	}
 
 	return resp, err
+}
+
+// Indicate whether the service is running
+func livenessHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"alive"}`))
+}
+
+// Indicate if the service is ready
+func readinessHandler(kvStore *service.KVStoreService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// In production, might check db connections, dependant service availability, or resource availability
+		// Report ready since using in-memory for test
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ready"}`))
+	}
 }
 
 // Retrieve environment variable or use default
